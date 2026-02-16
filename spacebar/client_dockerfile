@@ -1,0 +1,29 @@
+FROM node:18-bullseye AS builder
+
+ARG SPACEBAR_PUBLIC_URL
+
+WORKDIR /devel
+RUN apt-get update ; apt-get upgrade -y ; apt-get install -y build-essential
+RUN git clone https://github.com/MathMan05/Fermi.git
+
+
+
+WORKDIR /devel/Fermi
+CMD ["sh", "-c", "cat > ./src/webpage/instances.json <<'EOF'\n[{\n  \"name\": \"Lame Wizard Spacebar\",\n  \"url\": \"${SPACEBAR_PUBLIC_URL}\",\n  \"display\": true,\n  \"language\": \"en\",\n  \"country\": \"US\"\n}]\nEOF\n"]
+
+RUN npm i ; npm run build
+
+FROM node:20-alpine
+
+EXPOSE 8080
+
+WORKDIR /exec
+RUN apk add --update nodejs npm
+
+COPY --from=builder /devel/ . 
+
+RUN adduser -D fermiclient
+USER fermiclient
+
+WORKDIR /exec/Fermi
+CMD ["npm", "start"]
