@@ -1,0 +1,58 @@
+services:
+  spacebar-db:
+    image: postgres:alpine
+    container_name: spacebar-db
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ${SPACEBAR_DB_DATA_VOLUME}:/var/lib/postgresql/data
+    networks:
+      - spacebar-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U postgres -d postgres"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
+
+  spacebar-server:
+    image: ghcr.io/spacebarchat/server
+    container_name: spacebar-server
+    environment:
+      DATABASE: postgres://${SPACEBAR_SERVICE_DB_USER}:${SPACEBAR_SERVICE_DB_PASSWORD}@spacebar-db/${SPACEBAR_DB}
+      CONFIG_PATH: config/config.json
+    volumes:
+      - ${SPACEBAR_SERVICE_CONFIG_VOLUME}:/config
+      - ${SPACEBAR_SERVICE_FILE_VOLUME}:/files
+    expose:
+      - ${SPACEBAR_SERVICE_PORT}
+    ports:
+      - "3001:3001"
+    networks:
+      - spacebar-network
+    depends_on:
+      spacebar-db:
+        condition: service_healthy
+        restart: true
+
+  spacebar-client:
+    build:
+      context: .
+      args:
+        SPACEBAR_PUBLIC_URL: http://localhost:3001
+      dockerfile: ${CLIENT_BUILD_FILE}
+    command: sh -c "sleep 20 && npm start"    
+    ports:
+      - "8080:8080"
+    depends_on:
+      - spacebar-server
+    networks:
+      - spacebar-network  
+
+
+networks:
+  spacebar-network:
+    driver: bridge
+
+
